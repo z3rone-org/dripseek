@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Grid Circles</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    #canvasContainer {
+      position: relative;
+      width: 100%;
+      height: 80vh;
+      border: 2px dashed #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+      border: 1px solid #ccc;
+    }
+    .controls {
+      margin: 10px;
+    }
+    .circle {
+      position: absolute;
+      border: 2px solid red;
+      border-radius: 50%;
+      background: transparent;
+      cursor: grab;
+    }
+  </style>
+</head>
+<body>
+
+<div class="controls">
+  <input type="file" id="fileInput">
+  <label>m: <input type="number" id="rows" value="3" min="1"></label>
+  <label>n: <input type="number" id="cols" value="3" min="1"></label>
+  <button onclick="createGrid()">Create Grid</button>
+  <button onclick="exportCoords()">Export</button>
+</div>
+
+<div id="canvasContainer" 
+     ondragover="event.preventDefault()" 
+     ondrop="handleDrop(event)">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+let img = new Image();
+let circles = [];
+let radius = 20;
+let draggingCircle = null;
+let offsetX, offsetY;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const container = document.getElementById("canvasContainer");
+
+function resizeCanvasToImage() {
+  canvas.width = img.width;
+  canvas.height = img.height;
+  container.style.width = img.width + "px";
+  container.style.height = img.height + "px";
+}
+
+function drawImage() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+}
+
+function clearCircles() {
+  circles.forEach(c => c.el.remove());
+  circles = [];
+}
+
+function createGrid() {
+  clearCircles();
+  const m = parseInt(document.getElementById("rows").value);
+  const n = parseInt(document.getElementById("cols").value);
+  const spacingX = canvas.width / (n + 1);
+  const spacingY = canvas.height / (m + 1);
+  for (let i = 0; i < m; i++) {
+    circles.push([]);
+    for (let j = 0; j < n; j++) {
+      const x = (j + 1) * spacingX;
+      const y = (i + 1) * spacingY;
+      const el = document.createElement("div");
+      el.className = "circle";
+      el.style.width = el.style.height = radius * 2 + "px";
+      el.style.left = (x - radius) + "px";
+      el.style.top = (y - radius) + "px";
+      makeDraggable(el);
+      container.appendChild(el);
+      circles[i].push({ x, y, el });
+    }
+  }
+}
+
+function makeDraggable(el) {
+  el.onmousedown = (e) => {
+    draggingCircle = el;
+    offsetX = e.offsetX;
+    offsetY = e.offsetY;
+    el.style.cursor = "grabbing";
+    document.onmousemove = (e) => {
+      const rect = container.getBoundingClientRect();
+      el.style.left = (e.clientX - rect.left - offsetX) + "px";
+      el.style.top = (e.clientY - rect.top - offsetY) + "px";
+      updateCirclePosition(el);
+    };
+    document.onmouseup = () => {
+      document.onmousemove = null;
+      draggingCircle = null;
+      el.style.cursor = "grab";
+    };
+  };
+}
+
+function updateCirclePosition(el) {
+  for (let i = 0; i < circles.length; i++) {
+    for (let j = 0; j < circles[i].length; j++) {
+      if (circles[i][j].el === el) {
+        const rect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        circles[i][j].x = parseInt(el.style.left) + radius;
+        circles[i][j].y = parseInt(el.style.top) + radius;
+      }
+    }
+  }
+}
+
+function moveCircles(dx, dy) {
+  circles.flat().forEach(c => {
+    c.x += dx;
+    c.y += dy;
+    c.el.style.left = (c.x - radius) + "px";
+    c.el.style.top = (c.y - radius) + "px";
+  });
+}
+
+function resizeCircles(factor) {
+  radius *= factor;
+  circles.flat().forEach(c => {
+    c.el.style.width = c.el.style.height = radius * 2 + "px";
+    c.el.style.left = (c.x - radius) + "px";
+    c.el.style.top = (c.y - radius) + "px";
+  });
+}
+
+function exportCoords() {
+  let m = circles.length;
+  let n = (m > 0) ? circles[0].length : 0;
+  let result = "coords = [\n";
+  for (let i = 0; i < m; i++) {
+    result += "  [";
+    for (let j = 0; j < n; j++) {
+      let x = Math.round(circles[i][j].x);
+      let y = Math.round(circles[i][j].y);
+      result += `[${x}, ${y}]${j < n - 1 ? ", " : ""}`;
+    }
+    result += `]${i < m - 1 ? ",\n" : ""}`;
+  }
+  result += "\n]";
+  console.log(result);
+  navigator.clipboard.writeText(result)
+  .then(() => {
+    alert("Text copied to clipboard!");
+  })
+  .catch(err => {
+    alert("Failed to copy: ", err);
+  });
+}
+
+document.addEventListener("keydown", (e) => {
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-"].includes(e.key)) {
+    e.preventDefault();
+    if (e.key === "ArrowUp") moveCircles(0, -5);
+    if (e.key === "ArrowDown") moveCircles(0, 5);
+    if (e.key === "ArrowLeft") moveCircles(-5, 0);
+    if (e.key === "ArrowRight") moveCircles(5, 0);
+    if (e.key === "+") resizeCircles(1.1);
+    if (e.key === "-") resizeCircles(0.9);
+  }
+});
+
+document.getElementById("fileInput").onchange = (e) => {
+  loadImageFromFile(e.target.files[0]);
+};
+
+function handleDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) loadImageFromFile(file);
+}
+
+document.addEventListener("paste", (e) => {
+  const items = e.clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf("image") !== -1) {
+      const blob = items[i].getAsFile();
+      loadImageFromFile(blob);
+    }
+  }
+});
+
+function loadImageFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    img.onload = () => {
+      resizeCanvasToImage();
+      drawImage();
+      clearCircles();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+</script>
+
+</body>
+</html>
+
