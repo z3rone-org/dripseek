@@ -34,6 +34,10 @@
       background: transparent;
       cursor: grab;
     }
+    textarea {
+      width: 90%;
+      margin: 10px;
+    }
   </style>
 </head>
 <body>
@@ -41,15 +45,21 @@
 <div class="controls">
   <input type="file" id="fileInput">
   <label>m: <input type="number" id="rows" value="3" min="1"></label>
-  <label>n: <input type="number" id="cols" value="3" min="1"></label>
+  <label>n: <input type="number" id="cols" value="4" min="1"></label>
   <button onclick="createGrid()">Create Grid</button>
   <button onclick="exportCoords()">Export</button>
+  <button onclick="showGrayLevels()">Mean Gray</button>
 </div>
 
-<div id="canvasContainer" 
-     ondragover="event.preventDefault()" 
+<div id="canvasContainer"
+     ondragover="event.preventDefault()"
      ondrop="handleDrop(event)">
   <canvas id="canvas"></canvas>
+</div>
+
+<div class="controls">
+  <label>Mean grayscale matrix:</label><br>
+  <textarea id="grayOutput" rows="6" readonly></textarea>
 </div>
 
 <script>
@@ -127,8 +137,6 @@ function updateCirclePosition(el) {
   for (let i = 0; i < circles.length; i++) {
     for (let j = 0; j < circles[i].length; j++) {
       if (circles[i][j].el === el) {
-        const rect = el.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
         circles[i][j].x = parseInt(el.style.left) + radius;
         circles[i][j].y = parseInt(el.style.top) + radius;
       }
@@ -146,7 +154,8 @@ function moveCircles(dx, dy) {
 }
 
 function resizeCircles(factor) {
-  radius *= factor;
+  radius = Math.round(radius*factor);
+  console.log(radius)
   circles.flat().forEach(c => {
     c.el.style.width = c.el.style.height = radius * 2 + "px";
     c.el.style.left = (c.x - radius) + "px";
@@ -170,12 +179,64 @@ function exportCoords() {
   result += "\n]";
   console.log(result);
   navigator.clipboard.writeText(result)
-  .then(() => {
-    alert("Text copied to clipboard!");
-  })
-  .catch(err => {
-    alert("Failed to copy: ", err);
-  });
+    .then(() => alert("Copied coordinates to clipboard!"))
+    .catch(err => alert("Failed to copy: " + err));
+}
+
+function getMeanGrayAt(x, y, radius) {
+  x += 2
+  y += 2
+  const imgData = ctx.getImageData(x - radius, y - radius, radius * 2, radius * 2);
+  const data = imgData.data;
+
+  let sum = 0;
+  let count = 0;
+
+  for (let j = 0; j < radius * 2; j++) {
+    for (let i = 0; i < radius * 2; i++) {
+      const dx = i - radius;
+      const dy = j - radius;
+      if (dx * dx + dy * dy <= radius * radius) {
+        const idx = (j * radius * 2 + i) * 4;
+
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        sum += gray;
+        count++;
+
+        // Color this pixel red
+        //data[idx] = 255;
+        //data[idx + 1] = 0;
+        //data[idx + 2] = 0;
+      }
+    }
+  }
+
+  // Write modified image data back to canvas
+  //ctx.putImageData(imgData, x - radius, y - radius);
+
+  return count > 0 ? +(sum / count).toFixed(1) : 0;
+}
+
+
+function showGrayLevels() {
+  let m = circles.length;
+  let n = (m > 0) ? circles[0].length : 0;
+  let result = "[\n";
+  for (let i = 0; i < m; i++) {
+    result += "  [";
+    for (let j = 0; j < n; j++) {
+      let x = circles[i][j].x;
+      let y = circles[i][j].y;
+      let gray = getMeanGrayAt(x, y, radius);
+      result += `${gray}${j < n - 1 ? ", " : ""}`;
+    }
+    result += `]${i < m - 1 ? ",\n" : ""}`;
+  }
+  result += "\n]";
+  document.getElementById("grayOutput").value = result;
 }
 
 document.addEventListener("keydown", (e) => {
