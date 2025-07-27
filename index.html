@@ -304,6 +304,7 @@ function showGrayLevels() {
   let m = circles.length;
   let n = (m > 0) ? circles[0].length : 0;
   let result = "[\n";
+  let excelResult = ""
   for (let i = 0; i < m; i++) {
     result += "  [";
     for (let j = 0; j < n; j++) {
@@ -311,9 +312,16 @@ function showGrayLevels() {
       let y = circles[i][j].y;
       let gray = getMeanGrayAt(x, y, radius);
       result += `${gray}${j < n - 1 ? ", " : ""}`;
+      excelResult += `${gray}${j < n - 1 ? "\t" : ""}`;
     }
     result += `]${i < m - 1 ? ",\n" : ""}`;
+    excelResult += `${i < m - 1 ? "\n" : ""}`;
   }
+  navigator.clipboard.writeText(excelResult).then(() => {
+      alert('Table copied to clipboard! Paste into Excel.');
+  }).catch(err => {
+      console.error('Failed to copy:', err);
+  });
   result += "\n]";
   document.getElementById("grayOutput").value = result;
 }
