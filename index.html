@@ -267,7 +267,7 @@ function loadImageFromFile(file) {
   reader.readAsDataURL(file);
 }
 
-function getMeanGrayAt(x, y, radius) {
+function getGrayHist(x, y, radius) {
   x += 2
   y += 2
   const imgData = ctx.getImageData(x - radius, y - radius, radius * 2, radius * 2);
@@ -275,7 +275,7 @@ function getMeanGrayAt(x, y, radius) {
 
   let sum = 0;
   let count = 0;
-
+  let hist = [0,0,0,0,0,0,0,0,0,0];
   for (let j = 0; j < radius * 2; j++) {
     for (let i = 0; i < radius * 2; i++) {
       const dx = i - radius;
@@ -288,7 +288,9 @@ function getMeanGrayAt(x, y, radius) {
           const g = data[idx + 1];
           const b = data[idx + 2];
           const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          const grayIdx = Math.floor(gray/25.5)
           sum += gray;
+          hist[grayIdx]++;
           count++;
 
           // Color this pixel red
@@ -303,7 +305,7 @@ function getMeanGrayAt(x, y, radius) {
   // Write modified image data back to canvas
   //ctx.putImageData(imgData, x - radius, y - radius);
 
-  return count > 0 ? +(sum / count).toFixed(1) : 0;
+  return hist;
 }
 
 function showGrayLevels() {
@@ -312,16 +314,13 @@ function showGrayLevels() {
   let result = "[\n";
   let excelResult = ""
   for (let i = 0; i < m; i++) {
-    result += "  [";
     for (let j = 0; j < n; j++) {
       let x = circles[i][j].x;
       let y = circles[i][j].y;
-      let gray = getMeanGrayAt(x, y, radius);
-      result += `${gray}${j < n - 1 ? ", " : ""}`;
-      excelResult += `${gray}${j < n - 1 ? "\t" : ""}`;
+      let grayHist = getGrayHist(x, y, radius);
+      result += grayHist.join(',')+'\n';
+      excelResult += grayHist.join('\t')+'\n';
     }
-    result += `]${i < m - 1 ? ",\n" : ""}`;
-    excelResult += `${i < m - 1 ? "\n" : ""}`;
   }
   navigator.clipboard.writeText(excelResult).then(() => {
       alert('Table copied to clipboard! Paste into Excel.');
