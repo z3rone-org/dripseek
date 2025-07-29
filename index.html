@@ -319,7 +319,7 @@ function showGrayLevels() {
       let y = circles[i][j].y;
       let grayHist = getGrayHist(x, y, radius);
       result += grayHist.join(',')+'\n';
-      excelResult += grayHist.join('\t')+'\n';
+      excelResult += grayHist.join('\t')+'\r\n';
     }
   }
   navigator.clipboard.writeText(excelResult).then(() => {
