@@ -275,7 +275,12 @@ function getGrayHist(x, y, radius) {
 
   let sum = 0;
   let count = 0;
-  let hist = [0,0,0,0,0,0,0,0,0,0];
+  let bin_width = 255/30
+  let hist = [
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+  ];
   for (let j = 0; j < radius * 2; j++) {
     for (let i = 0; i < radius * 2; i++) {
       const dx = i - radius;
@@ -288,7 +293,7 @@ function getGrayHist(x, y, radius) {
           const g = data[idx + 1];
           const b = data[idx + 2];
           const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-          const grayIdx = Math.floor(gray/25.5)
+          const grayIdx = Math.floor(gray/bin_width)
           sum += gray;
           hist[grayIdx]++;
           count++;
