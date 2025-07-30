@@ -39,6 +39,14 @@
     .inner-circle {
       border: 2px solid blue;
     }
+    .reference-circle {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid limegreen;
+      background: transparent;
+      pointer-events: auto;
+      cursor: grab;
+    }
   </style>
 </head>
 <body>
@@ -73,8 +81,10 @@
 let img = new Image();
 let circles = [];
 let radius = 20;
+let nHist = 30;
 let innerRadius = 15;
 let draggingCircle = null;
+let referenceCircle = null;
 let offsetX, offsetY;
 
 const canvas = document.getElementById("canvas");
@@ -139,7 +149,28 @@ function createGrid() {
   }
 }
 
-function makeDraggable(outerEl, innerEl) {
+function createReferenceCircle() {
+  if (referenceCircle) {
+    referenceCircle.remove(); // Remove existing
+  }
+
+  const x = canvas.width / 2;
+  const y = canvas.height / 2;
+
+  const el = document.createElement("div");
+  el.className = "reference-circle";
+  el.style.width = radius * 2 + "px";
+  el.style.height = radius * 2 + "px";
+  el.style.left = (x - radius) + "px";
+  el.style.top = (y - radius) + "px";
+
+  container.appendChild(el);
+  referenceCircle = el;
+
+  makeDraggable(el, null, true); // last param = isReference
+}
+
+function makeDraggable(outerEl, innerEl, isReference = false) {
   outerEl.onmousedown = (e) => {
     draggingCircle = outerEl;
     offsetX = e.offsetX;
@@ -156,10 +187,11 @@ function makeDraggable(outerEl, innerEl) {
       const x = newX + radius;
       const y = newY + radius;
 
-      innerEl.style.left = (x - innerRadius) + "px";
-      innerEl.style.top = (y - innerRadius) + "px";
-
-      updateCirclePosition(e.target);
+      if (innerEl) {
+        innerEl.style.left = (x - innerRadius) + "px";
+        innerEl.style.top = (y - innerRadius) + "px";
+        updateCirclePosition(e.target);
+      }
     };
 
     document.onmouseup = () => {
@@ -260,6 +292,7 @@ function loadImageFromFile(file) {
     img.onload = () => {
       resizeCanvasToImage();
       drawImage();
+      createReferenceCircle();
       clearCircles();
     };
     img.src = e.target.result;
@@ -275,12 +308,8 @@ function getGrayHist(x, y, radius) {
 
   let sum = 0;
   let count = 0;
-  let bin_width = 255/30
-  let hist = [
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-  ];
+  let bin_width = 255/nHist;
+  let hist = Array(nHist).fill(0);;
   for (let j = 0; j < radius * 2; j++) {
     for (let i = 0; i < radius * 2; i++) {
       const dx = i - radius;
@@ -313,18 +342,73 @@ function getGrayHist(x, y, radius) {
   return hist;
 }
 
+function getGrayHistThreshold(x, y, radius) {
+  x += 2
+  y += 2
+  const imgData = ctx.getImageData(x - radius, y - radius, radius * 2, radius * 2);
+  const data = imgData.data;
+
+  let sum = 0;
+  let count = 0;
+  let bin_width = 255/nHist;
+  let hist = Array(nHist).fill(0);;
+  for (let j = 0; j < radius * 2; j++) {
+    for (let i = 0; i < radius * 2; i++) {
+      const dx = i - radius;
+      const dy = j - radius;
+      if (dx * dx + dy * dy <= radius * radius) {
+        if (dx * dx + dy * dy >= innerRadius * innerRadius) {
+          const idx = (j * radius * 2 + i) * 4;
+
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          const grayIdx = Math.floor(gray/bin_width)
+          sum += gray;
+          hist[grayIdx]++;
+          count++;
+        }
+      }
+    }
+  }
+
+  cumsum = 0;
+  console.log("Ref Hist:", hist)
+  for(let i = nHist-1; i>=0; i--) {
+    cumsum += hist[i];
+    if(cumsum >= count*0.9) {
+      return i;
+    }
+  }
+
+  return 0;
+}
+
 function showGrayLevels() {
   let m = circles.length;
   let n = (m > 0) ? circles[0].length : 0;
   let result = "[\n";
-  let excelResult = ""
+  let excelResult = "";
+ 
+  const x = parseInt(referenceCircle.style.left) + referenceCircle.offsetWidth / 2;
+  const y = parseInt(referenceCircle.style.top) + referenceCircle.offsetHeight / 2;
+
+  let thresh = getGrayHistThreshold(x, y, radius);
+  console.log("Hist thresh:", thresh);
+  
   for (let i = 0; i < m; i++) {
     for (let j = 0; j < n; j++) {
       let x = circles[i][j].x;
       let y = circles[i][j].y;
       let grayHist = getGrayHist(x, y, radius);
-      result += grayHist.join(',')+'\n';
-      excelResult += grayHist.join('\t')+'\r\n';
+      grayHist = grayHist.slice(0, thresh+1);
+      let threshGray = 0;
+      for(let i = 0; i < thresh; i++) {
+        threshGray += grayHist[i]*(nHist-i);
+      }
+      excelResult += threshGray+'\r\n';
+      //excelResult += grayHist.join('\t')+'\r\n';
     }
   }
   navigator.clipboard.writeText(excelResult).then(() => {
